@@ -1,0 +1,401 @@
+-- GROUP BY
+
+SELECT DEPT_CODE, SUM(SALARY)
+FROM EMPLOYEE
+GROUP BY DEPT_CODE
+ORDER BY 1;
+
+-- HAVING
+
+SELECT DEPT_CODE, SUM(SALARY)
+FROM EMPLOYEE
+WHERE DEPT_CODE IS NOT NULL
+GROUP BY DEPT_CODE
+HAVING SUM(SALARY)>7000000
+ORDER BY 1;
+
+-- 1. 실습
+-- EMPLOYEE 테이블서 직급별 그룹을 묶어 직급코드 급여 합계 평균 인원수
+SELECT JOB_CODE 직급코드,
+    SUM(SALARY) 급여합계,
+    TRUNC(AVG(SALARY)) 급여평균,
+    COUNT(*) 인원수
+FROM EMPLOYEE
+GROUP BY JOB_CODE
+HAVING COUNT(*)>3
+ORDER BY 인원수 DESC;
+
+-- ROLLUP & CUBE
+
+SELECT DEPT_CODE, JOB_CODE, SUM(SALARY)
+FROM EMPLOYEE
+GROUP BY ROLLUP(DEPT_CODE, JOB_CODE)
+ORDER BY 1,2;
+
+SELECT DEPT_CODE, JOB_CODE, SUM(SALARY)
+FROM EMPLOYEE
+GROUP BY ROLLUP(JOB_CODE, DEPT_CODE)
+ORDER BY 1,2;
+
+SELECT DEPT_CODE, JOB_CODE, SUM(SALARY)
+FROM EMPLOYEE
+GROUP BY CUBE(DEPT_CODE, JOB_CODE)
+ORDER BY 1,2;
+
+SELECT DEPT_CODE, JOB_CODE, SUM(SALARY)
+FROM EMPLOYEE
+GROUP BY CUBE(JOB_CODE,DEPT_CODE)
+-- 오더바이에서 널값을 가장 먼저 보거나 가장 나중에 보고싶을 경우
+ORDER BY 1 NULLS FIRST,2 NULLS LAST;
+
+
+
+SELECT DECODE(GROUPING(DEPT_CODE),1,DECODE(GROUPING(JOB_CODE),1,'총 합계','부서별 합계'),NVL(DEPT_CODE,'소속부서 없음')) 부서코드,
+    DECODE(GROUPING(JOB_CODE),1,DECODE(GROUPING(DEPT_CODE),1,'총 합계','직급별 합계'),JOB_CODE) 직급코드,
+    SUM(SALARY) 급여합계
+FROM EMPLOYEE
+GROUP BY CUBE(DEPT_CODE,JOB_CODE)
+ORDER BY 1,2;
+
+
+-- SET OPERATION 
+-- 두 개 이상의 SELECT한 결과(RESULTSET)를 합치거나, 중복을 별도로 제거하는 등 집합으로 취급해 제 2의 결과를 산출해내는 명령어
+-- UNION : 두 개 이상의 RESULT SET의 합을 구하는 명령어
+--         두 개 이상의 결과를 합쳐서 보여준다(중복되는 결과가 있을 경우 한 개의 행만 보여준다
+-- UNION ALL : 두 개 이상의 결과를 합쳐서 보여줌
+--             결과가 중복된다면 모두 보여줌(중복제거X)
+-- INTERSECT : 더 개 이상의 결과 중 중복되는 결과만 출력한다
+-- MINUS : A와 B의 결과를 합쳤을때 우선되는 A중 B와 겹치지 않는 결과만 출력한다
+-- 어떤 SET 명령어를 사용하든간에 결과의 모양은 반드시 같아야한다
+-- EX) RESULTSET A와 RESULTSET B를 합칠 경우 A와 B의 컬럼갯수와 컬럼자료형이 반드시 같아야한다
+
+-- UNION
+-- 두 결과셋(RESULT SET)의 합을 구하는 집합 명령어
+-- 중복 거름
+SELECT EMP_ID 사번, EMP_NAME 사원명, DEPT_CODE 부서, SALARY 급여
+FROM EMPLOYEE
+WHERE DEPT_CODE='D5'
+
+UNION
+
+SELECT EMP_ID 사번, EMP_NAME 사원명, DEPT_CODE 부서, SALARY 급여
+FROM EMPLOYEE
+WHERE SALARY>=3000000;
+
+-- UNION ALL
+-- 중복안거르고 다 뽑아줌 우선 수행되는 결과셋 기준으로 합침 (A->B)
+SELECT EMP_ID 사번, EMP_NAME 사원명, DEPT_CODE 부서, SALARY 급여
+FROM EMPLOYEE
+WHERE DEPT_CODE='D5'
+
+UNION ALL
+
+SELECT EMP_ID 사번, EMP_NAME 사원명, DEPT_CODE 부서, SALARY 급여
+FROM EMPLOYEE
+WHERE SALARY>=3000000;
+
+-- ROLLUP을 CUBE처럼 조회하는 방법
+SELECT DEPT_CODE,JOB_CODE,SUM(SALARY)
+FROM EMPLOYEE
+GROUP BY ROLLUP(DEPT_CODE,JOB_CODE)
+
+UNION
+
+SELECT DEPT_CODE, JOB_CODE, SUM(SALARY)
+FROM EMPLOYEE
+GROUP BY ROLLUP(JOB_CODE, DEPT_CODE)
+ORDER BY 1, 2;
+
+
+-- INTERSECT(교집합)
+-- 두 개 이상의 결과들을 합하여 중복되는 값만 추출하는 집합 연산자
+-- D5번 부서 직원들의 정보와 급여가 300마넌 이상인 직원들의 정보를 합해 겹치는놈만
+SELECT EMP_ID, EMP_NAME, DEPT_CODE, SALARY
+FROM EMPLOYEE
+WHERE DEPT_CODE='D5'
+
+INTERSECT
+
+SELECT EMP_ID, EMP_NAME, DEPT_CODE, SALARY
+FROM EMPLOYEE
+WHERE SALARY>=3000000;
+
+-- MINUS(차집합)
+-- 두 개 이상의 리젙셋중 처음에서 딴거 뺌
+SELECT EMP_ID, EMP_NAME, DEPT_CODE, SALARY
+FROM EMPLOYEE
+WHERE DEPT_CODE='D5'
+
+MINUS
+
+SELECT EMP_ID, EMP_NAME, DEPT_CODE, SALARY
+FROM EMPLOYEE
+WHERE SALARY>=3000000;
+
+-- GROUPING SETS(그룹 집합 연산자)
+-- 그룹 별로 처리된 여러개의 결과셋을 하나로 합칠 때 사용한다
+
+SELECT DEPT_CODE,
+    JOB_CODE,
+    MANAGER_ID,
+    TRUNC(AVG(SALARY))
+FROM EMPLOYEE
+GROUP BY GROUPING SETS(
+                (DEPT_CODE, JOB_CODE, MANAGER_ID),
+                (DEPT_CODE, MANAGER_ID),
+                (JOB_CODE, MANAGER_ID)
+                );
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------
+-- JOIN
+-- 두 개 이상의 테이블을 하나로 합칠 때 사용하는 명령어
+-- 만약 J6의 근무부서를 알고싶다면
+SELECT DEPT_CODE
+FROM EMPLOYEE
+WHERE JOB_CODE='J6';
+
+SELECT * FROM DEPARTMENT;
+
+SELECT DEPT_TITLE
+FROM DEPARTMENT
+WHERE DEPT_ID IN ('D1', 'D8');
+-- 여러개 써야해서 커찮다
+
+-- 오라클 전용 구문
+-- FROM 구문에 콤마를 통해 합치게 될 테이블들을 나열하고 WHERE 조건을 통해 합칠 테이블들의 공통점을 연결하여 하나의 테이블 형식으로 구축한다
+SELECT EMP_ID,
+    EMP_NAME,
+    DEPT_CODE,
+    DEPT_TITLE
+FROM EMPLOYEE, DEPARTMENT
+WHERE DEPT_CODE=DEPT_ID
+ORDER BY 2;
+
+SELECT EMP_ID,
+    EMP_NAME,
+    JOB_NAME
+FROM EMPLOYEE E, JOB J
+WHERE E.JOB_CODE=J.JOB_CODE;
+--FROM EMPLOYEE, JOB
+--WHERE EMPLOYEE.JOB_CODE=JOB.JOB_CODE; <--- 이거도 됨
+
+-- ANSI 표준 구문
+-- 조인하고자 하는 테이블을 FROM 구문 다음에 JOIN 테이블명 ON() | USING() 구문을 사용함
+
+-- 조인쓰고 온 안에 조건식
+SELECT EMP_ID,
+    EMP_NAME,
+    DEPT_TITLE
+FROM EMPLOYEE JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID);
+
+-- 컬럼명이 같으면 유징 하나로 퉁칠수있음
+SELECT EMP_ID,
+    EMP_NAME,
+    JOB_NAME
+FROM EMPLOYEE JOIN JOB USING(JOB_CODE);
+
+
+-- EMPLOYEE 테이블의 직원 급여정보와 SAL_GRADE 의 급여 등급을 합쳐서 사번, 이름, 급여등급, 등급기준최소, 최대
+SELECT EMP_ID 사번,
+    EMP_NAME 사원명,
+    E.SAL_LEVEL 급여등급,
+    MIN_SAL "등급 기준 최소",
+    MAX_SAL "등급 기준 최대"
+FROM EMPLOYEE E, SAL_GRADE S
+WHERE E.SAL_LEVEL=S.SAL_LEVEL;
+
+SELECT EMP_ID 사번,
+    EMP_NAME 사원명,
+    SAL_LEVEL 급여등급,
+    MIN_SAL "등급 기준 최소",
+    MAX_SAL "등급 기준 최대"
+FROM EMPLOYEE JOIN SAL_GRADE USING(SAL_LEVEL);
+
+-- DEPARTMENT 테이블의 위치정보와 로케이숀 테이블을 쪼인하여 각 부서별 근무지 위치를 조회하셈
+SELECT * FROM DEPARTMENT FULL JOIN LOCATION ON(LOCATION_ID=LOCAL_CODE);
+
+
+SELECT DEPT_ID 부서코드,
+    DEPT_TITLE 부서명,
+    LOCAL_CODE 근무지코드,
+    LOCAL_NAME 근무지위치
+FROM DEPARTMENT, LOCATION
+WHERE LOCATION_ID=LOCAL_CODE;
+
+SELECT DEPT_ID 부서코드,
+    DEPT_TITLE 부서명,
+    LOCAL_CODE 근무지코드,
+    LOCAL_NAME 근무지위치
+FROM DEPARTMENT JOIN LOCATION ON (LOCATION_ID=LOCAL_CODE);
+
+
+-- INNER JOIN 과 OUTER JOIN
+-- 두 개 이상의 테이블을 하나로 합칠 떄
+-- 이너는 둘 모두 일치하는 데이터만 추출하고
+-- 아우터는 둘 중 하나만, 혹은 둘 모두가 가진 모든 값을 추출할 때 사용한다
+
+-- INNER JOIN
+SELECT DEPT_CODE,
+    EMP_NAME
+FROM EMPLOYEE
+JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID);
+
+-- OUTER JOIN
+-- LEFT OUTER JOIN : 두 테이블 중 원본 테이블의 정보를 모두 포함하고자 할 떄 사용한다
+-- RIGHT OUTER JOIN : 두 테이블 중 JOIN에 명시한 테이블의 정보를 모두 포함하고자 할 때 사용
+-- FULL OUTER JOIN : 두 테이블이 각각 가지는 모든 정보들을 포함하여 합침
+
+-- LEFT JOIN
+-- ORACLE 구문
+SELECT DEPT_CODE,
+    EMP_NAME
+FROM EMPLOYEE, DEPARTMENT
+WHERE DEPT_CODE=DEPT_ID(+);
+
+-- ANSI 구문
+SELECT DEPT_CODE,
+    EMP_NAME
+FROM EMPLOYEE
+LEFT JOIN DEPARTMENT ON (DEPT_CODE=DEPT_ID);
+--LEFT OUTER JOIN DEPARTMENT ON (DEPT_CODE=DEPT_ID); <-- 아우터라는 구문은 걍 생략 가능
+
+-- RIGHT JOIN
+-- ORACLE 구문
+SELECT DEPT_ID,
+    EMP_NAME
+FROM EMPLOYEE, DEPARTMENT
+WHERE DEPT_CODE(+)=DEPT_ID
+ORDER BY 1;
+
+-- ANSI 구문
+SELECT * FROM DEPARTMENT;
+SELECT DISTINCT DEPT_CODE FROM EMPLOYEE;
+
+SELECT DEPT_CODE,
+    DEPT_ID,
+    EMP_NAME
+FROM EMPLOYEE
+RIGHT JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID)
+ORDER BY 2;
+
+-- FULL OUTER JOIN
+-- ANSI 구문
+SELECT DEPT_CODE,
+    EMP_NAME
+FROM EMPLOYEE
+FULL JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID);
+
+-- ORACLE 구문
+-- ORACLE 구문은 FULL OUTER JOIN을 사용하지 못한다
+
+-- CROSS JOIN
+-- 기본적으로 JOIN이라면 양 측의 테이블 모두 하나씩은 일치하는 컬럼을 가지고 조인하는데 이를 EQUAL JOIN 이퀄조인이라함
+-- 만약 서로 같은 값을 가지지 않는 테이블을 조회하려 할 경우 사용하는 조인 방식이 크로스 조인이다
+SELECT EMP_NAME,
+    NATIONAL_CODE
+FROM EMPLOYEE
+CROSS JOIN NATIONAL;
+-- 크로스 쪼인하면 결과가 카테시안 곱의 형태로 추출되는데
+-- 카테시안곱이란 각 컬럼의 결과가 경우의 수 갯수 형태로 출력되는 것
+-- 따라서 크로스조인은 사용을 가장 지양하며 어절수없이 사용할 경우 결과를 감내해야함
+
+-- NON EQUAL JOIN(NON EQ JOIN)
+-- 지정한 컬럼 값 자체가 아닌 특정 범위 내에 존재하는 조건으로 조인을 수행할 경우 사용
+
+-- ON() 구문 안에 들어가는 형식은 컬럼명 뿐만 아니라 계산식이나 범위, 조건 등 표현식을 걸어도 됨
+SELECT EMP_NAME,
+    DEPT_CODE,
+    SALARY,
+    E.SAL_LEVEL
+FROM EMPLOYEE E
+JOIN SAL_GRADE ON (SALARY BETWEEN MIN_SAL AND MAX_SAL);
+
+-- SELF JOIN
+-- 자기 자신을 쪼인의 대상으로 삼아 한 테이블의 정보 중 값 비교가 필요한 정보들을 계산하여 추출함
+-- 직원의 정보와 직원을 담당하는 매니저의 정보
+-- ORACLE 구문
+SELECT E.EMP_ID,
+    E.EMP_NAME,
+    E.MANAGER_ID,
+    M.EMP_NAME
+FROM EMPLOYEE E, EMPLOYEE M
+WHERE E.MANAGER_ID=M.EMP_ID;
+
+
+-- ANSI 구문
+SELECT E.EMP_ID,
+    E.EMP_NAME,
+    E.MANAGER_ID,
+    M.EMP_NAME
+FROM EMPLOYEE E
+JOIN EMPLOYEE M ON(E.MANAGER_ID=M.EMP_ID);
+
+
+
+-- 다중 JOIN
+-- 여러 개의 테이블을 조인하는 것을 다중 조인이라고 한다
+-- 일반 조인과 선언 형식은 같으나 조인한 결과를 기준으로 다음 조인을 수행하기 때문에 JOIN 선언의 순서에 반드시 유의해야한다 순서조심
+
+-- ORACLE 구문
+SELECT EMP_ID,
+    EMP_NAME,
+    DEPT_TITLE,
+    LOCAL_NAME
+FROM EMPLOYEE, DEPARTMENT, LOCATION
+WHERE DEPT_CODE=DEPT_ID AND LOCATION_ID=LOCAL_CODE;
+
+-- ANSI 구문
+SELECT EMP_ID,
+    EMP_NAME,
+    DEPT_TITLE,
+    LOCAL_NAME
+FROM EMPLOYEE
+JOIN DEPARTMENT ON (DEPT_CODE=DEPT_ID)
+JOIN LOCATION ON (LOCATION_ID=LOCAL_CODE);
+
+
+
+-- 4. 직급이 대리면서 아시아에 근무하는 직원을 조회
+-- 사번 사원명 직급명 부서명 근무지역명 급여
+SELECT EMP_ID 사번,
+    EMP_NAME 사원명,
+    JOB_NAME 직급명,
+    DEPT_TITLE 부서명,
+    LOCAL_NAME 근무지역명
+FROM EMPLOYEE
+JOIN JOB USING(JOB_CODE)
+JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID)
+JOIN LOCATION ON(LOCATION_ID=LOCAL_CODE);
+
+SELECT EMP_ID 사번,
+    EMP_NAME 사원명,
+    JOB_NAME 직급명,
+    DEPT_TITLE 부서명,
+    LOCAL_NAME 근무지역명
+FROM EMPLOYEE E, JOB J, DEPARTMENT, LOCATION
+WHERE E.JOB_CODE=J.JOB_CODE 
+        AND DEPT_CODE=DEPT_ID
+        AND LOCATION_ID=LOCAL_CODE;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

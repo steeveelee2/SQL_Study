@@ -1,0 +1,422 @@
+-- DAY9
+
+-- CREATE : 데이터베이스의 객체를 생성하는 DDL
+-- CREATE TABLE 테이블명(컬럼명 자료형(크기) 제약조건)
+
+-- 제약조건 :
+--  NOT NULL - NULL이 들어갈 수 없다 (필수 입력 사항)
+--  UNIQUE - 중복값을 허용하지 않는다
+--  CHECK - 조건 안에 들어있는 값만 허용한다
+--  PRIMARY KEY - (NOT NULL + UNIQUE) 하나만 설정할 수 있다 (테이블 내의 식별자 역할)
+--  FOREIGN KEY - 다른 테이블의 컬럼과 연결해주는 제약조건 (기본키이거나 UNIQUE 제약조건이 걸려 있는 컬럼만 참조가능)
+
+
+
+-- DML (데이터 조작 언어)
+-- INSERT, UPDATE, DELETE, SELECT(DQL)
+-- CRUD   프로그램이 데이터를 처리하는 기능
+-- C(CREATE) : INSERT
+-- R(READ) : SELECT
+-- U(UPDATE) : UPDATE
+-- D(DELETE) : DELETE
+
+-- DML : 데이터 추가, 수정, 삭제 등 처리와 관련된 기능을 제공하는 명령어들
+
+
+-- INSERT : 새로운 행을 테이블에 추가하는 명령어, 실행하고 난 뒤에 테이블 행의 갯수가 증가한다
+-- 1)
+-- INSERT INTO 테이블명 [(컬럼명, . . .)] VALUES (값1, 값2, . . .)
+-- 해당 테이블의 특정 컬럼이나 모든 컬럼에 해당하는 값들을 추가할 때 사용한다
+-- 2)
+-- INSERT INTO 테이블명 VALUES (값1, 값2, . . .)
+-- 해당 테이블에 있는 모든 컬럼에 대한 값을 추가할 때 사용한다
+
+-- 컬럼을 명시하여 사용하는 경우 지정한 컬럼에 맞게 값을 추가한다
+INSERT INTO EMPLOYEE(EMP_ID, EMP_NAME, EMP_NO, EMAIL, PHONE, DEPT_CODE, JOB_CODE, SAL_LEVEL, SALARY,
+                        BONUS, MANAGER_ID, HIRE_DATE, ENT_DATE, ENT_YN)
+VALUES (500,'이소근','741230-1234567','lee_sg@kh.or.kr','01022334455','D1','J7','S4',3100000,0.1,'200',SYSDATE,NULL,DEFAULT);
+
+-- 컬럼을 생략하여 사용하는 경우 모든 컬럼의 값을 기입해야한다
+INSERT INTO EMPLOYEE
+VALUES (900,'장채현','901123-1080503','jang_ch@kh.or.kr','01055569512','D1','J7','S3',4300000,0.2,'200',SYSDATE,NULL,DEFAULT);
+
+SELECT * FROM EMPLOYEE WHERE EMP_NAME IN ('이소근','장채현');
+
+COMMIT;
+
+
+-- INSERT 구문에 서브쿼리를 사용할 수 있다
+-- INSERT 구문에 VALUES 대신 서브쿼리를 이용하여 값을 추가하는 경우
+
+CREATE TABLE EMP_01(
+    EMP_ID NUMBER,
+    EMP_NAME VARCHAR2(20),
+    DEPT_TITLE VARCHAR2(35)
+);
+
+INSERT INTO EMP_01 (
+    SELECT EMP_ID, EMP_NAME, DEPT_TITLE
+    FROM EMPLOYEE
+    LEFT JOIN DEPARTMENT ON (DEPT_CODE=DEPT_ID)
+);
+
+SELECT * FROM EMP_01;
+
+COMMIT;
+
+
+-- INSERT ALL
+-- 1)
+-- 서브쿼리를 활용하여 INSERT를 수행할 때 서브쿼리가 사용하는 테이블이 같다면 두 개 이상의 테이블을 INSERT ALL로 처리할 수 있다
+-- 이 때 각 서브쿼리 조건 구문은 반드시 같아야한다
+-- 2)
+-- 만약 서브쿼리 조건에 관계없이 단순히 INSERT 구문을 여러개 묶어서 실행하고자 하는 경우 서브쿼리가 들어갈 조건 부분에
+-- 'SELECT * FROM DUAL'을 작성하고 VALUES를 직접 기입해 여러 개를 묶어서 처리할 수 있다
+
+CREATE TABLE EMP_DEPT_D1
+AS SELECT EMP_ID, EMP_NAME, DEPT_CODE, HIRE_DATE FROM EMPLOYEE WHERE 1=2;
+
+SELECT * FROM EMP_DEPT_D1;
+
+CREATE TABLE EMP_MANAGER
+AS SELECT EMP_ID, EMP_NAME, DEPT_CODE, MANAGER_ID FROM EMPLOYEE WHERE 1=2;
+
+SELECT * FROM EMP_MANAGER;
+
+-- 1. 실습
+-- EMP_DEPT_D1 테이블에 EMPLOYEE 테이블에 존재하는 D1 부서의 사원 정보들을 추가
+INSERT INTO EMP_DEPT_D1(
+    SELECT EMP_ID, EMP_NAME, DEPT_CODE, HIRE_DATE
+    FROM EMPLOYEE
+    WHERE DEPT_CODE='D1'
+);
+
+-- EMP_MANAGER 테이블에 EMPLOYEE 테이블에 존재하는 D1 부서의 사원 정보들을 추가
+INSERT INTO EMP_MANAGER(
+    SELECT EMP_ID, EMP_NAME, DEPT_CODE, MANAGER_ID
+    FROM EMPLOYEE
+    WHERE DEPT_CODE='D1'
+);
+
+SELECT * FROM EMP_DEPT_D1;
+
+SELECT * FROM EMP_MANAGER;
+
+COMMIT;
+
+DELETE FROM EMP_DEPT_D1;
+DELETE FROM EMP_MANAGER;
+
+INSERT ALL 
+    INTO EMP_DEPT_D1 VALUES(EMP_ID, EMP_NAME, DEPT_CODE, HIRE_DATE)
+    INTO EMP_MANAGER VALUES(EMP_ID, EMP_NAME, DEPT_CODE, MANAGER_ID)
+SELECT EMP_ID, EMP_NAME, DEPT_CODE, HIRE_DATE, MANAGER_ID
+FROM EMPLOYEE
+WHERE DEPT_CODE='D1';
+
+SELECT * FROM EMP_DEPT_D1;
+SELECT * FROM EMP_MANAGER;
+
+COMMIT;
+
+
+CREATE TABLE EMP_OLD
+AS SELECT EMP_ID, EMP_NAME, HIRE_DATE, SALARY FROM EMPLOYEE WHERE 1=2;
+CREATE TABLE EMP_NEW
+AS SELECT EMP_ID, EMP_NAME, HIRE_DATE, SALARY FROM EMPLOYEE WHERE 1=2;
+
+SELECT * FROM EMP_OLD;
+SELECT * FROM EMP_NEW;
+
+-- 2. 실습 
+-- 입사일 기준 2000년 1월 1일 이전은 올드 이후는 뉴우
+INSERT ALL
+    WHEN HIRE_DATE<'2000/01/01' THEN INTO EMP_OLD VALUES (EMP_ID, EMP_NAME, HIRE_DATE, SALARY)
+    WHEN HIRE_DATE>='2000/01/01' THEN INTO EMP_NEW VALUES (EMP_ID, EMP_NAME, HIRE_DATE, SALARY)
+SELECT EMP_ID, EMP_NAME, HIRE_DATE, SALARY
+FROM EMPLOYEE;
+
+SELECT * FROM EMP_OLD;
+SELECT * FROM EMP_NEW;
+
+COMMIT;
+
+
+
+-- UPDATE : 해당 테이블의 데이터를 수정하는 명령어
+-- UPDATE 테이블명 SET 컬럼명 = 바꿀 값 [WHERE 컬럼명 비교연산자 비교값]
+-- 실행 후의 테이블 행 전체 갯수가 변함없다 단순히 내부 수정값만 바뀜
+
+CREATE TABLE DEPT_COPY
+AS SELECT * FROM DEPARTMENT;
+
+SELECT * FROM DEPT_COPY;
+
+-- 'D9'번 부서의 이름을 '전략기획팀'으로 변경
+UPDATE DEPT_COPY SET DEPT_TITLE='전략기획팀' WHERE DEPT_ID='D9';
+SELECT * FROM DEPT_COPY;
+
+
+-- EMPLOYEE 테이블 주민번호 잘못된 200 201 214번 바꾸기
+-- 621230 631126 850705
+UPDATE EMPLOYEE SET EMP_NO='621230' WHERE EMP_ID='200';
+
+UPDATE EMPLOYEE SET EMP_NO='621230'||SUBSTR(EMP_NO,7,14) WHERE EMP_ID='200';
+UPDATE EMPLOYEE SET EMP_NO='631126-1548654' WHERE EMP_ID='201';
+UPDATE EMPLOYEE SET EMP_NO='850705-1313513' WHERE EMP_ID='214';
+
+COMMIT;
+
+
+
+-- UPDATE 구문과 서브쿼리
+-- 여러행을 변경하거나 여러 컬럼값을 변경하고자 할때 서브쿼리를 사용하여 스크림트 작성 가능
+-- UPDATE 테이블명 SET 컬럼명 = {서브쿼리)
+
+CREATE TABLE EMP_SALARY
+AS SELECT EMP_ID, EMP_NAME, DEPT_CODE, SALARY, BONUS FROM EMPLOYEE;
+
+SELECT * FROM EMP_SALARY WHERE EMP_NAME IN('유재식','방명수');
+
+-- 맹수 벌이를 재식이랑 같은 돈, 뽀나스 
+-- 단일행 서브쿼리로 해결
+UPDATE EMP_SALARY SET SALARY=(SELECT SALARY FROM EMP_SALARY WHERE EMP_NAME='유재식'),
+                      BONUS=(SELECT BONUS FROM EMP_SALARY WHERE EMP_NAME='유재식')
+WHERE EMP_NAME='방명수';
+
+-- 4. 실습
+-- '노옹철', '전형돈', '정중하', '하동운' 도 올리기
+UPDATE EMP_SALARY SET (SALARY, BONUS)=(SELECT SALARY, BONUS FROM EMP_SALARY WHERE EMP_NAME='유재식')
+WHERE EMP_NAME IN ('노옹철', '전형돈', '정중하', '하동운');
+
+SELECT * FROM EMP_SALARY WHERE EMP_NAME IN('유재식','방명수','노옹철', '전형돈', '정중하', '하동운');
+
+COMMIT;
+
+
+-- 5 실습
+-- 아시아 전 직원 보너스 0.5
+UPDATE EMP_SALARY SET BONUS=0.5
+WHERE EMP_NAME IN (SELECT EMP_NAME 
+                FROM EMP_SALARY JOIN DEPARTMENT ON (DEPT_CODE=DEPT_ID)
+                JOIN LOCATION ON (LOCATION_ID=LOCAL_CODE AND LOCAL_NAME LIKE ('ASIA%')));
+
+SELECT * FROM EMP_SALARY;
+-- UPDATE 시 변경할 값은 해당 컬럼의 제약조건에 위배되지 않아야한다
+-- UPDATE 시에 변경할 값은 해당 컬럼의 제약조건에 위배되지 않아야 한다.
+-- integrity constraint (EMPLOYEE.SYS_C007130) violated - parent key not found
+-- FOREIGN KEY 제약조건에 위배되는 경우
+UPDATE EMPLOYEE
+SET DEPT_CODE = 'D0'
+WHERE DEPT_CODE = 'D6';
+
+-- ORA-01407: cannot update ("EMPLOYEE"."EMPLOYEE"."EMP_ID") to NULL
+-- NOT NULL 제약조건에 위배되는 경우
+UPDATE EMPLOYEE
+SET EMP_ID = NULL
+WHERE EMP_ID = 900;
+
+-- ORA-00001: unique constraint (EMPLOYEE.SYS_C007138) violated
+-- UNIQUE 제약조건에 위배되는 경우
+UPDATE EMPLOYEE
+SET EMP_NO = '741230-1234567'
+WHERE EMP_NAME = '선동일';
+
+SELECT * FROM EMPLOYEE
+WHERE ENT_YN = 'Y';
+
+-- UPDATE 시에 기본값(DEFAULT)을 활용할 수 있다.
+UPDATE EMPLOYEE
+SET ENT_YN = DEFAULT
+WHERE EMP_ID = 222;
+
+COMMIT;
+-- UPDATE 시 기본값 사용 가능
+COMMIT;
+
+
+-- MERGE
+-- 구조가 동일한 두 테이블을 하나로 합칠 때 사용
+-- MERGE INTO A_TABLE USING B_TABLE ON(A.컬럼명=B.컬럼명)   <--- B테이블을 A에 더한다는 뜻
+-- WHEN MATCHED THEN   <---- A 테이블의 컬럼과 B 테이블의 컬럼이 겹칠 경우
+-- WHEN NOT MATCHED THEN    <---- A 테이블의 컬럼과 B테이블의 컬럼이 다를 경우
+
+CREATE TABLE EMP_M01
+AS SELECT * FROM EMPLOYEE;
+
+CREATE TABLE EMP_M02
+AS SELECT * FROM EMPLOYEE WHERE JOB_CODE='J4';
+
+SELECT * FROM EMP_M01;
+SELECT * FROM EMP_M02;
+
+INSERT INTO EMP_M02
+VALUES(999,'곽두원','561016-1234567','kwack_dw@kh.or.kr','01011112222','D9','J1','S1',9000000,0.5,NULL,SYSDATE,DEFAULT,DEFAULT);
+
+UPDATE EMP_M02 SET BONUS=0;
+
+COMMIT;
+
+-- MERGE를 써서 합체
+MERGE INTO EMP_M01 USING EMP_M02 ON (EMP_M01.EMP_ID = EMP_M02.EMP_ID)
+WHEN MATCHED THEN -- 컬럼의 내용이 겹칠 때
+UPDATE SET
+    EMP_M01.EMP_NAME = EMP_M02.EMP_NAME,
+    EMP_M01.EMP_NO = EMP_M02.EMP_NO,
+    EMP_M01.EMAIL = EMP_M02.EMAIL,
+    EMP_M01.PHONE = EMP_M02.PHONE,
+    EMP_M01.DEPT_CODE  = EMP_M02.DEPT_CODE,
+    EMP_M01.JOB_CODE = EMP_M02.JOB_CODE,
+    EMP_M01.SAL_LEVEL = EMP_M02.SAL_LEVEL,
+    EMP_M01.SALARY = EMP_M02.SALARY,
+    EMP_M01.BONUS = EMP_M02.BONUS,
+    EMP_M01.MANAGER_ID = EMP_M02.MANAGER_ID,
+    EMP_M01.HIRE_DATE = EMP_M02.HIRE_DATE,
+    EMP_M01.ENT_DATE = EMP_M02.ENT_DATE,
+    EMP_M01.ENT_YN = EMP_M02.ENT_YN
+WHEN NOT MATCHED THEN -- 컬럼 내용이 겹치지 않을 때
+INSERT VALUES(
+    EMP_M02.EMP_ID, EMP_M02.EMP_NAME, EMP_M02.EMP_NO,
+    EMP_M02.EMAIL, EMP_M02.PHONE, EMP_M02.DEPT_CODE, 
+    EMP_M02.JOB_CODE, EMP_M02.SAL_LEVEL, EMP_M02.SALARY,
+    EMP_M02.BONUS, EMP_M02.MANAGER_ID, EMP_M02.HIRE_DATE,
+    EMP_M02.ENT_DATE, EMP_M02.ENT_YN
+);
+
+SELECT * FROM EMP_M01
+WHERE JOB_CODE = 'J4';
+
+SELECT * FROM EMPLOYEE
+WHERE JOB_CODE = 'J4';
+
+SELECT * FROM EMP_M02;
+
+COMMIT;
+
+
+
+
+-- DELETE
+-- 테이블의 행을 삭제, 행의 갯수가 줄어든다
+-- DELETE FROM 테이블명 (WHERE 조건)
+-- 마냐게 WHERE 조건을 작성하지 않고 실행할 경우에 해당 테이블의 모든 정보가 삭제된다
+
+DROP TABLE TEST_DELETE;
+CREATE TABLE TEST_DELETE
+AS SELECT * FROM EMPLOYEE;
+
+SELECT * FROM TEST_DELETE;
+
+COMMIT;
+
+DELETE FROM TEST_DELETE;
+
+ROLLBACK;
+
+-- D1을 참조하는 다른 테이블의 자식 컬럼이 존재해서 FOREIGN KEY 제약조건에 위배된다
+DELETE FROM DEPARTMENT WHERE DEPT_ID='D1';
+
+-- 부모 자식 둘다 해당값을 사용하고 있지 않으면 지울 수 있따
+SELECT * FROM EMPLOYEE WHERE DEPT_CODE='D3';
+DELETE FROM DEPARTMENT WHERE DEPT_ID='D3';
+
+ROLLBACK;
+
+-- 제약조건을 비활성화하여 해당컬럼의 값을 삭제가능 (권장X)
+SELECT * FROM USER_CONSTRAINTS WHERE TABLE_NAME='EMPLOYEE';
+
+ALTER TABLE EMPLOYEE
+DISABLE CONSTRAINT SYS_C007108 CASCADE;
+
+DELETE FROM DEPARTMENT WHERE DEPT_ID='D1';
+
+ROLLBACK;
+
+-- 재활성화
+ALTER TABLE EMPLOYEE
+ENABLE CONSTRAINT SYS_C007108;
+
+
+
+
+-- TRUNCATE : DELETE와 유사하게 데이타를 삭제하는 명령어
+-- 장점 : 테이블 전체 행의 데이타를 삭제하며, DELETE보다 실행 속도가 빠르다
+-- 단점 : ROLLBACK을 수행할 수 없다
+
+SELECT * FROM EMP_SALARY;
+
+COMMIT;
+
+DELETE FROM EMP_SALARY;
+
+ROLLBACK;
+-- DELETE시 롤백 십건웅
+
+TRUNCATE TABLE EMP_SALARY;
+
+SELECT * FROM EMP_SALARY;
+
+ROLLBACK;
+-- TRUNCATE시 롤백 모담 ㅠㅠ
+
+
+
+
+-- TCL
+-- (TRANSACTION CONTROL LANGUAGE)
+-- 트랜잭션 제어 언어
+-- COMMIT / ROLLBACK [/ SAVEPOINT]
+
+-- 트랜잭션이란?
+-- 데이터 처리와 관련된 작업의 최소단위
+-- 논리적 작업 단위(LUW : LOGICAL UNIT OF WORKS)
+-- 하나의 트랜잭션으로 이루어진 작업은 반드시 한꺼번에 저장되거나 취소되어야한다
+-- 따라서 해당 작업 시점을 구분하여 COMMIT(작업 내역 저장) / ROLLBACK(작업 내역 취소)을 반드시 처리가능해야한다
+
+-- COMMIT : 트랜잭션이 종료될 시점에 정상적으로 종료되었으면 작업한 내용을 영구히 저장한다
+-- ROLLBACK : 트랜잭션 실행 중 잘못 수행된 내용이 있을 경우 취소하고 가장 최근 COMMIT시점으로 돌아간다
+-- SAVEPOINT 임시저장소명 : 현재 트랜잭션 진행 중 구역을 나누어 현재까지 진행된 내용을 중간 저장해야할 경우 사용
+-- ROLLBACK TO 임시저장소명 : 트랜잭션 작업을 SAVEPOINT시점으로 돌린다
+
+COMMIT;
+
+CREATE TABLE USER_TBL(
+    USERNO NUMBER UNIQUE,
+    USERID VARCHAR2(20) NOT NULL UNIQUE,
+    USERPWD VARCHAR2(30) NOT NULL
+);
+
+INSERT INTO USER_TBL
+VALUES (1, 'TEST1', 'PASS1');
+INSERT INTO USER_TBL
+VALUES (2, 'TEST2', 'PASS2');
+INSERT INTO USER_TBL
+VALUES (3, 'TEST3', 'PASS3');
+
+SELECT * FROM USER_TBL;
+
+COMMIT;
+
+INSERT INTO USER_TBL
+VALUES (4, 'TEST4', 'PASS4');
+
+ROLLBACK;
+
+SAVEPOINT SP1;
+
+INSERT INTO USER_TBL
+VALUES (5, 'TEST5', 'PASS5');
+
+SELECT * FROM USER_TBL;
+
+ROLLBACK TO SP1;
+
+ROLLBACK;
+
+
+
+
+
+
+
+

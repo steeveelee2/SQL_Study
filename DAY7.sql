@@ -1,0 +1,279 @@
+-- DAY 7
+-- 서브쿼리 : 메인쿼리 안에서 조건이나 하나의 검색을 위한 기반을 형성할 수 있는 또 하나의 쿼리문
+
+-- 단일 행 서브쿼리 : 결과값이 1개 나옴
+SELECT * FROM EMPLOYEE WHERE SALARY=(SELECT MIN(SALARY) FROM EMPLOYEE);
+
+-- 다중 행 서브쿼리 : 결과값이 여러개 나옴
+SELECT * FROM EMPLOYEE WHERE SALARY >ANY(SELECT MIN(SALARY) FROM EMPLOYEE GROUP BY JOB_CODE);
+
+-- 다중 행 다중 열 서브쿼리 : 많음
+SELECT * FROM EMPLOYEE WHERE (JOB_CODE,SALARY) IN(SELECT JOB_CODE, MIN(SALARY) FROM EMPLOYEE GROUP BY JOB_CODE)
+ORDER BY JOB_CODE;
+
+-- 다중 열 서브쿼리 : 여러 컬럼을 결과로 추출하는 서브쿼리
+-- 퇴사한 여직원과 같은 직급, 같은 부서에 근무하는 직원들의 정보
+-- 단일 행 서브쿼리
+SELECT * FROM EMPLOYEE WHERE DEPT_CODE=(SELECT DEPT_CODE FROM EMPLOYEE WHERE ENT_YN='Y')
+                         AND JOB_CODE=(SELECT JOB_CODE FROM EMPLOYEE WHERE ENT_YN='Y')
+                         AND EMP_NAME!=(SELECT EMP_NAME FROM EMPLOYEE WHERE ENT_YN='Y');
+-- 다중 행 서브쿼리
+SELECT * FROM EMPLOYEE WHERE (DEPT_CODE, JOB_CODE)=(SELECT DEPT_CODE, JOB_CODE FROM EMPLOYEE WHERE ENT_YN='Y')
+                        AND EMP_NAME!=(SELECT EMP_NAME FROM EMPLOYEE WHERE ENT_YN='Y');
+
+
+-- 서브쿼리의 사용위치
+-- SELECT FROM WHERE HAVING GROUP BY ORDER BY
+-- DML 구문 : INSERT, UPDATE, DELETE
+-- DDL 구문 : CREATE TABLE, CREATE VIEW
+
+-- FROM 절에서 사용하는 서브쿼리는 테이블을 직접 조회하는 대신에 서브쿼리의 RESULTSET을 활용하여 데이터를 조회하는데 씀
+-- 테이블을 대체한다는 의미에서 인라인 뷰(INLINE VIEW)라고 부른다
+
+-- 직급별 평균 급여를 조회하는 서브쿼리를 사용하여 정보 조회
+SELECT EMP_NAME, JOB_NAME, SALARY
+FROM (
+    SELECT JOB_CODE, TRUNC(AVG(SALARY),-3) AS "JOBAVG"
+    FROM EMPLOYEE
+    GROUP BY JOB_CODE
+) V
+JOIN JOB J ON(V.JOB_CODE=J.JOB_CODE)
+JOIN EMPLOYEE E ON(E.SALARY=JOBAVG) AND E.JOB_CODE=V.JOB_CODE;
+
+-- 인라인 뷰를 활용한 데이터 조회
+SELECT * FROM EMPLOYEE;
+SELECT * FROM (SELECT EMP_ID, EMP_NAME, DEPT_CODE, JOB_CODE FROM EMPLOYEE);
+
+-- TOP-N 분석
+-- 인라인 뷰를 활용한 TOP-N분석
+
+-- ROWNUM : 데이터를 조회할 때 번호를 매기는 함수
+
+SELECT ROWNUM, EMP_NAME, SALARY
+FROM EMPLOYEE;
+
+SELECT ROWNUM,EMP_NAME, SALARY
+FROM EMPLOYEE
+WHERE ROWNUM <=5;
+
+-- 1. 실습
+-- 급여 기준 가장 높은 급여를 받는 사원 상위 5명 선출
+SELECT ROWNUM, EMP_ID, EMP_NAME, SALARY
+FROM (SELECT SALARY, EMP_ID, EMP_NAME FROM EMPLOYEE ORDER BY SALARY DESC)
+WHERE ROWNUM <6;
+-- ROWNUM은 FROM 구문 실행할때 번호를 매기는 방식으로 처리됨
+-- SELECT시에 번호를 하나하나 부여한다
+-- ROWNUM은 반드시 1부터 시작하기 때문에 1을 초과한 순서를 따질 수 없다
+-- 6번부터 10번까지 뽑을라면? 한번 더 인라인뷰
+SELECT R, EMP_ID, EMP_NAME, SALARY
+FROM (
+SELECT ROWNUM AS "R", EMP_ID, EMP_NAME, SALARY
+FROM (SELECT SALARY, EMP_ID, EMP_NAME FROM EMPLOYEE ORDER BY SALARY DESC)
+)
+WHERE R >5 AND R<11;
+
+-- 2. 실습
+-- 급여 평균이 3위 안에 드는 부서의 부서코드, 부서명, 급여 평균조회
+SELECT ROWNUM, A.*
+FROM (SELECT DEPT_CODE, DEPT_TITLE, AVG(SALARY) AS "S" 
+    FROM EMPLOYEE JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID) GROUP BY DEPT_CODE, DEPT_TITLE ORDER BY 3 DESC) A
+WHERE ROWNUM <4;
+
+-- TOP-N 분석
+-- 상위 N개 혹은 하위 N개 결과값을 조회하는 방식
+-- 인라인 뷰와 ROWNUM 혹은 RANK, DENSE_RANK()함수를 활용하여 구현할 수 있다
+
+-- 직원 정보에서 급여를 많이 받는 직원 순위 조회
+
+-- RANK() 함수 : 공동이면 다음 적당히 거르는 함수
+SELECT EMP_NAME, SALARY,
+            RANK() OVER(ORDER BY SALARY DESC) 순위
+FROM EMPLOYEE;
+
+SELECT * FROM (
+SELECT EMP_NAME, SALARY,
+            RANK() OVER(ORDER BY SALARY DESC) 순위
+FROM EMPLOYEE
+)
+WHERE 순위<4; 
+
+-- DENSE_RANK() 함수 : 공동이라도 다음 숫자 줌
+SELECT EMP_NAME, SALARY,
+            DENSE_RANK() OVER(ORDER BY 2 DESC) 순위
+FROM EMPLOYEE;
+
+SELECT * FROM(
+SELECT EMP_NAME, SALARY,
+            DENSE_RANK() OVER(ORDER BY SALARY DESC) 순위
+FROM EMPLOYEE
+)
+WHERE 순위 <7;
+
+-- 3. 실습
+-- EMPLOYEE 테이블에서 보너스를 포함한 연봉이 가장 높은 직원 상위 5
+SELECT T.*
+FROM(
+    SELECT RANK() OVER(ORDER BY SALARY*12*(1+NVL(BONUS,0)) DESC) 순위, EMP_ID 사번, EMP_NAME 사원명, DEPT_TITLE 부서명,
+            JOB_NAME 직급명, HIRE_DATE 입사일, SALARY*12*(1+NVL(BONUS,0)) 연봉
+    FROM EMPLOYEE JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID) JOIN JOB USING(JOB_CODE)
+) T
+WHERE 순위<6;
+
+
+-- WITH 구문
+-- 동일한 서브쿼리를 반복해서 사용할 경우 해당 쿼리문을 미리 저장해두고 필요할 때 별칭을 통해 꺼내어 쓰는 방식
+-- WITH 별칭 AS (쿼리문)
+-- 인라인 뷰에서만 사용이 가능하다
+-- 중복되는 쿼리문을 반복 작성할 필요가 없으며 기존 저장된걸 써서 실행속도 향상 십가능
+
+-- 급여 정보를 기준으로 내림차순한 쿼리를 WITH 구문에 저장해서 별칭으로 불러쓰기
+
+WITH "급여순위" AS (SELECT RANK() OVER(ORDER BY SALARY DESC), EMP_NAME, SALARY FROM EMPLOYEE)
+
+SELECT *
+FROM 급여순위;
+
+
+-- 4. 실습
+-- 부서별 급여합계가 전체부서 급여 총합의 20%보다 많은 부서의 부서명과 부서 급여 합계를 조회
+
+-- 일반 단일 행 서브쿼리
+SELECT DEPT_TITLE 부서명, SUM(SALARY) "부서 급여 합계"
+FROM EMPLOYEE JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID)
+GROUP BY DEPT_TITLE
+HAVING SUM(SALARY)>(
+        SELECT SUM(SALARY)*0.2
+        FROM EMPLOYEE
+);
+
+-- 인라인 뷰
+SELECT D.*
+FROM (
+    SELECT DEPT_TITLE 부서명, SUM(SALARY) "부서 급여 합계"
+    FROM EMPLOYEE JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID)
+    GROUP BY DEPT_TITLE
+) D
+WHERE "부서 급여 합계">(SELECT SUM(SALARY)*0.2 FROM EMPLOYEE);
+
+-- WITH
+WITH D AS(
+    SELECT DEPT_TITLE 부서명, SUM(SALARY) "부서 급여 합계"
+    FROM EMPLOYEE JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID)
+    GROUP BY DEPT_TITLE
+)
+SELECT D.*
+FROM D
+WHERE "부서 급여 합계">(SELECT SUM(SALARY)*0.2 FROM EMPLOYEE);
+
+
+--WITH 여러개 등록해 사용하기
+SELECT SUM(SALARY) FROM EMPLOYEE;
+SELECT AVG(SALARY) FROM EMPLOYEE;
+
+WITH SUM_SAL AS (SELECT SUM(SALARY) FROM EMPLOYEE),
+    AVG_SAL AS (SELECT ROUND(AVG(SALARY)) FROM EMPLOYEE)
+SELECT * FROM SUM_SAL
+UNION
+SELECT * FROM AVG_SAL;
+
+WITH SUM_SAL AS (SELECT SUM(SALARY) FROM EMPLOYEE),
+    AVG_SAL AS (SELECT ROUND(AVG(SALARY)) FROM EMPLOYEE)
+SELECT * FROM SUM_SAL, AVG_SAL;
+
+
+
+-- 상[호연]관 서브쿼리
+-- 일반적으로 서브 쿼리가 만든 결과값을 메인쿼리에서 비교하여 사용하는 서브쿼리와는 다르게
+-- 메인쿼리가 사용하는 컬럼 값이나 표현식 등을 서브쿼리가 사용해서 결과를 도출하는 방식의 서브쿼리
+-- 메인쿼리의 컬럼값이 변경되면 서브쿼리도 그 영향을 받아 도출되는 값이 달라진다
+
+-- 관리자 사번이 EMPLOYEE 테이블에 존재하는 사원들에 대해서 조회
+SELECT EMP_ID, EMP_NAME, DEPT_CODE, MANAGER_ID
+FROM EMPLOYEE E
+--WHERE MANAGER_ID IS NOT NULL;
+WHERE EXISTS(SELECT EMP_ID FROM EMPLOYEE M WHERE E.MANAGER_ID=M.EMP_ID);
+
+-- 사원의 직급에 따른 급여의 평균보다 많이 받는 사원
+SELECT EMP_ID, EMP_NAME, JOB_CODE, SALARY
+FROM EMPLOYEE E
+WHERE SALARY >(SELECT AVG(SALARY) FROM EMPLOYEE M WHERE E.JOB_CODE=M.JOB_CODE);
+
+
+-- 스칼라 서브쿼리 : 단일행 + 상관쿼리
+-- SELECT, WHERE, ORDER BY 구문에서 사용한다
+-- 보통 SELECT에서 많이 사용해서 SELECT LIST라고도 불린다
+
+-- 5. 실습
+-- 모든 사원의 사번, 사원명, 관리자 사번, 관리자명을 조회
+-- 단 관리자가 없을 경우 '없음' 표기
+SELECT E.EMP_ID 사번, E.EMP_NAME 사원명, NVL(E.MANAGER_ID,'없음') 관리자사번,
+    NVL((SELECT M.EMP_NAME FROM EMPLOYEE M WHERE E.MANAGER_ID=M.EMP_ID),'없음') 관리자명
+FROM EMPLOYEE E;
+
+
+-- 스칼라 서브쿼리는 유일하게 ORDER BY 구문에서 사용할 수 있다
+
+-- 모든 직원의 사번, 사원명, 소속부서 부서명 내림차순
+SELECT EMP_ID, EMP_NAME, DEPT_TITLE
+FROM EMPLOYEE JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID)
+ORDER BY (SELECT DEPT_TITLE FROM DEPARTMENT  WHERE DEPT_CODE=DEPT_ID) DESC;
+
+
+
+
+
+
+
+-- 1. 현재 '기술지원부'에 근무하는 사무실을 다른 장소로 옮기려고 한다.
+-- '기술지원부'에 근무하는 직원들의 수를 JOIN을 사용하지 않고 구하시오.
+-- 단, 퇴사자는 포함하지 않는다.
+SELECT COUNT(*) "기술지원부 직원 수"
+FROM EMPLOYEE E
+WHERE E.DEPT_CODE=(SELECT D.DEPT_ID FROM DEPARTMENT D WHERE D.DEPT_TITLE='기술지원부');
+
+-- 2. 부서별 입사일이 가장 빠른 사원의
+-- 사번, 이름, 부서명(NULL이면 '소속없음'), 직급명, 입사일을 조회하고
+-- 입사일이 빠른 순으로 조회하시오
+SELECT EMP_ID 사번, EMP_NAME 이름, NVL(DEPT_TITLE,'소속없음') 부서명, JOB_NAME 직급명, HIRE_DATE 입사일
+FROM EMPLOYEE LEFT JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID) JOIN JOB USING(JOB_CODE)
+WHERE HIRE_DATE IN(SELECT MIN(HIRE_DATE) FROM EMPLOYEE GROUP BY DEPT_CODE)
+GROUP BY NVL(DEPT_TITLE,'소속없음'), EMP_ID, EMP_NAME, JOB_NAME, HIRE_DATE
+ORDER BY 입사일 ASC;
+
+-- 3. 직급별 나이가 가장 어린 직원의
+-- 사번, 이름, 직급명, 나이, 보너스 포함 연봉을 조회하고
+-- 나이순으로 내림차순 정렬하시오
+-- 단 연봉은 \9,999,999,999 양식으로 출력되게 하시오
+SELECT EMP_ID 사번, EMP_NAME 이름, JOB_NAME 직급명, TRUNC(MONTHS_BETWEEN(SYSDATE,TO_DATE(SUBSTR(EMP_NO,1,6)))/12) 나이,
+    TO_CHAR(SALARY*(1+NVL(BONUS,0))*12,'L9,999,999,999') 연봉
+FROM EMPLOYEE JOIN JOB USING(JOB_CODE)
+WHERE (JOB_CODE, TRUNC(MONTHS_BETWEEN(SYSDATE,TO_DATE(SUBSTR(EMP_NO,1,6)))/12)) IN(
+        SELECT JOB_CODE, MIN(TRUNC(MONTHS_BETWEEN(SYSDATE,TO_DATE(SUBSTR(EMP_NO,1,6)))/12))
+        FROM EMPLOYEE
+        GROUP BY JOB_CODE
+    )
+ORDER BY 나이 DESC;
+
+-- 4. 모든 직원의 사번, 이름, 소속부서를 조회하고자 한다.
+-- 단, 부서명 내림차순, 부서명이 같다면 직급명으로 내림차순 정렬하여 
+-- 조회하고, ORDER BY 절에서 스칼라 서브쿼리를 사용하여 조회 하시오
+SELECT EMP_ID 사번, EMP_NAME 이름, DEPT_TITLE 부서명
+FROM EMPLOYEE E JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID)
+ORDER BY (SELECT DEPT_TITLE FROM DEPARTMENT WHERE DEPT_CODE=DEPT_ID) DESC,
+        (SELECT JOB_NAME FROM JOB J WHERE E.JOB_CODE=J.JOB_CODE) DESC;
+
+-- 5. 아시아지역에서 일하고 있는 직원의 국가별 직원 수 와 급여 평균을 조회하고
+-- 급여 평균이 높은 순으로 순위를 매겨 지역명, 국가명, 직원수, 급여평균, 순위를
+-- 조회하시오
+SELECT RANK() OVER(ORDER BY 급여평균 DESC) 순위, 아시아.*
+FROM (
+    SELECT LOCAL_NAME 지역명, NATIONAL_NAME 국가명,
+          COUNT(*) 직원수, TRUNC(AVG(SALARY)) 급여평균
+    FROM EMPLOYEE JOIN DEPARTMENT ON(DEPT_CODE=DEPT_ID)
+          JOIN LOCATION ON(LOCATION_ID=LOCAL_CODE AND LOCAL_NAME LIKE 'ASIA%') JOIN NATIONAL USING(NATIONAL_CODE)
+    GROUP BY NATIONAL_NAME, LOCAL_NAME
+) 아시아;
+
+
+
+
