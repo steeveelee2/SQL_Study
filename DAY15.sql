@@ -1,0 +1,440 @@
+-- DAY15
+
+-- 프로시저(PROCEDURE)
+-- PL/SQL 구문을 저장하는 객체
+-- 스크립트를 필요할 때마다 호출하여 사용하는 것이 목적이다
+-- [사용방식]
+-- CREATE [OR REPLACE] PROCEDURE 프로시저명
+--      (매개변수1 [IN/OUT/IN OUT] 자료형[, 매개변수2 [MODE] 자료형 . . . ])
+--  변수의 MODE(유형)
+--  IN : 프로시저에서 사용할 변수 값을 외부에서 전달 받을 때 사용하는 모드
+--  OUT : 스크립트를 실행한 결과를 외부로 추출할 때 사용하는 모드(EX) RETURN)
+--  IN OUT : IN과 OUT 두가지 모두 허용하는 모드
+--      (단, IN/OUT 둘 중 하나의 기능만 사용할 수 있다)
+-- IS (DECLARE와 동일, 지역변수를 선언);
+-- BEGIN 실행할 스크립트; (함수호출, 절차적 알고리즘, SQL 구문)
+-- END;
+-- /
+-- [호출방식]
+-- EXECUTE 프로시저명 [(전달값1, 전달값2 ...)]
+-- EXEC . .. . . . .
+-- [삭제]
+-- DROP PROCEDURE 프로시저명;
+-- [프로시저 조회]
+-- 데이터사전 : USER_SOURCE;
+
+CREATE TABLE EMP_DUP
+AS SELECT * FROM EMPLOYEE;
+
+CREATE OR REPLACE PROCEDURE DEL_ALL_EMP
+IS
+    -- 지역변수 선언이 없을 경우에도 IS를 생략할 수 없다
+BEGIN
+    DELETE FROM EMP_DUP;
+    COMMIT;
+END;
+/
+
+EXEC DEL_ALL_EMP;
+
+SELECT * FROM EMP_DUP;
+
+
+
+-- 매개변수가 있는 프로시저
+
+-- [IN]
+DROP TABLE EMP_01;
+
+CREATE TABLE EMP_01
+AS SELECT * FROM EMPLOYEE;
+
+-- 특정 이름을 가진 직원 정보 삭제하기
+
+-- 삭제할 직원 정보 확인
+SELECT * FROM EMP_01
+WHERE EMP_NAME LIKE '이%';
+
+-- 매개변수가 있는 프로시저 생성
+CREATE OR REPLACE PROCEDURE
+    DEL_EMPNAME (V_NAME IN EMP_01.EMP_NAME%TYPE)
+IS
+BEGIN
+    DELETE FROM EMP_01
+    WHERE EMP_NAME LIKE V_NAME;
+    DBMS_OUTPUT.PUT_LINE(V_NAME||'관련 직원 정보가 삭제되었습니다.');
+    COMMIT;
+END;
+/
+
+SET SERVEROUTPUT ON;
+SHOW ERRORS;
+
+EXEC DEL_EMPNAME('이%');
+
+
+-- [OUT]
+-- OUT모드는 내부의 값을 외부로 전달하기 때문에 외부에서도 값을 받을수있는 변수 객체를 생성하여야 한다
+-- 내부의 값을 전달받을 변수 선언
+-- VARIABLE 변수명 자료형(바이트);
+-- EXEC 프로시저명(전달값, :전달받을 값);
+-- CREATE OR REPLACE 프로시저명 (변수명 OUT 자료형)
+--                                  **OUT으로 선언한 자료형과 VARIABLE로 전달받을 변수의 자료형은 반드시 동일해야한다
+-- 받은값 출력 시 PRINT 변수명;
+
+-- 직원 정보를 조회하여 변수에 직원 정보를 삽입한 후 꺼내오기
+CREATE OR REPLACE PROCEDURE
+    SAL_EMP_ID(VEMPID IN EMPLOYEE.EMP_ID%TYPE,
+                VEMPNAME OUT EMPLOYEE.EMP_NAME%TYPE,
+                VSAL OUT EMPLOYEE.SALARY%TYPE,
+                VJOB OUT EMPLOYEE.JOB_CODE%TYPE
+                )
+IS
+BEGIN
+    SELECT EMP_NAME, SALARY, JOB_CODE
+    INTO VEMPNAME, VSAL, VJOB
+    FROM EMPLOYEE
+    WHERE EMP_ID=VEMPID;
+END;
+/
+
+VARIABLE VAR_ENAME VARCHAR2(20);
+VARIABLE VAR_SAL NUMBER;
+VARIABLE VAR_JOB CHAR(2);
+
+PRINT VAR_ENAME;
+PRINT VAR_SAL;
+PRINT VAR_JOB;
+
+EXEC SAL_EMP_ID(210, :VAR_ENAME, :VAR_SAL, :VAR_JOB);
+
+-- 자동으로 입력된 값 출력하기 위한 설정
+SET AUTOPRINT ON;
+EXEC SAL_EMP_ID(220, :VAR_ENAME, :VAR_SAL, :VAR_JOB);
+
+
+
+-- IN OUT : 둘 중 하나의 역할을 모두 수행하는 모드
+
+-- 1. 실습
+CREATE TABLE DEPT_01
+AS SELECT * FROM DEPARTMENT;
+
+-- 부서코드를 입력받아 해당 부서를 삭제한 뒤 삭제된 부서의 이름을 출력하는 프로시저
+-- 만약 조회한 부서가 없다면 NO_DATA_FOUND를 활용하여 '해당 부서가 존재하지 않습니다' 출력
+
+
+
+CREATE OR REPLACE PROCEDURE
+    DEL_DEPARTMENT (V_DEPT_ID IN DEPT_01.DEPT_ID%TYPE,
+                    V_DEPT_TITLE OUT DEPT_01.DEPT_TITLE%TYPE)
+IS
+BEGIN
+    DELETE FROM DEPT_01
+    WHERE DEPT_ID LIKE V_DEPT_ID;
+    DBMS_OUTPUT.PUT_LINE(V_DEPT_TITLE||' 삭제 완료');
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN 
+    DBMS_OUTPUT.PUT_LINE('해당부서가 존재하지 않읍니다..');
+END;
+/
+
+VARIABLE V_DEPT_TITLE VARCHAR2(30);
+
+EXEC DEL_DEPARTMENT('D1', :V_DEPT_TITLE);
+
+SELECT * FROM DEPT_01;
+
+
+-- FUNCTION
+-- 내부에서 계산된 결과를 반환하는 객체
+-- SUM(*), AVG(*), MAX(*), MIN(*), COUNT(*)
+-- 프로시저와 사용용도가 매우 흡사하다
+
+-- [사용형식]
+-- CRREATE [OR REPLACE] FUNCTION 함수이름 (매개변수 [MODE] 자료형)
+-- RETURN 자료형; -- 반환할 결과의 자료형태
+-- IS
+--  지역변수;
+-- BEGIN
+--  실행할 스크립트;
+-- RETURN
+--  결과데이터;
+-- END;
+-- /
+
+-- [사용방법]
+-- 밖에서 받을 변수
+-- VARIABLE 변수명 자료형;
+-- EXEC :변수명 :=함수명(전달값, :OUT변수, ...);
+
+-- 입력한 사번에 해당하는 직원의 보너스 계산하기
+CREATE OR REPLACE FUNCTION
+        BONUS_CALC(V_EMP_ID EMPLOYEE.EMP_ID%TYPE)
+RETURN NUMBER
+IS
+    v_SAL EMPLOYEE.SALARY%TYPE;
+    V_BONUS EMPLOYEE.BONUS%TYPE;
+    CALC_SAL NUMBER;
+BEGIN
+    SELECT SALARY, NVL(BONUS,0)
+    INTO V_SAL, V_BONUS
+    FROM EMPLOYEE
+    WHERE EMP_ID=V_EMP_ID;
+    CALC_SAL := V_SAL * V_BONUS;
+    RETURN CALC_SAL;
+END;
+/
+
+VARIABLE RESULT_SAL NUMBER;
+
+EXEC :RESULT_SAL :=BONUS_CALC('&사번');
+
+SELECT EMP_NAME, SALARY, BONUS_CALC(EMP_ID)
+FROM EMPLOYEE
+WHERE BONUS_CALC(EMP_ID) > 500000;
+
+
+-- 2. 실습
+-- 직원들의 연봉을 계산하는 함수를 만들어보시오
+
+CREATE OR REPLACE FUNCTION
+    CALC_YB(V_EMP_NAME EMPLOYEE.EMP_NAME%TYPE)
+    RETURN NUMBER
+IS
+    V_SAL EMPLOYEE.SALARY%TYPE;
+    V_BONUS EMPLOYEE.BONUS%TYPE;
+    CALC_SAL NUMBER;
+BEGIN
+    SELECT SALARY, NVL(BONUS,0)
+    INTO V_SAL, V_BONUS
+    FROM EMPLOYEE
+    WHERE EMP_NAME=V_EMP_NAME;
+    CALC_SAL := (V_SAL+(V_SAL*V_BONUS))*12;
+    RETURN CALC_SAL;
+END;
+/
+
+VARIABLE RESULT_SAL NUMBER;
+
+EXEC :RESULT_SAL :=CALC_YB('&사원명');
+
+
+-- CURSOR (커서)
+-- 처리 결과가 여러 행으로 구해지는 SELECT문을 처리할때 사용하는 객체
+-- 한 행 한 행을 처리하면서 각 행의 결과를 임시로 담아 놓아 각 행들의 결과를 모두 출력한다
+
+-- CURSOR의 상태(시작부터 실행, 종료까지의 상태)
+-- OPEN : 커서가 시작됨을 의미
+-- FETCH : 한 줄씩 읽어오는, 실행중인 상태
+-- CLOSE : 커서의 반복이 종료됨을 의미
+-- OPEN ~ FETCH ~ CLOSE
+
+-- CURSOR의 상태에 따른 분류
+-- %NOTFOUND : 커서 영역의 데이터가 모두 FETCH(실행)되었음을 의미하며 만약 다음 행이 존재하지 않는다면 TRUE를 반환한다
+-- %FOUND : 커서 실행 다음 데이터가 아직 존재하면 TRUE
+-- %ISOPEN : 커서가 OPEN된 상태면 TRUE
+-- %ROWCOUNT : 읽어온 레코드(행)의 숫자
+
+CREATE OR REPLACE PROCEDURE CURSOR_DEPT
+IS
+    V_DEPT DEPARTMENT%ROWTYPE;
+    CURSOR C1
+    IS
+    SELECT * FROM DEPARTMENT;
+BEGIN
+    OPEN C1; -- 커서의 시작
+    LOOP
+        FETCH C1 
+        INTO
+            V_DEPT.DEPT_ID,
+            V_DEPT.DEPT_TITLE,
+            V_DEPT.LOCATION_ID;
+        EXIT WHEN C1%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('부서코드 '||V_DEPT.DEPT_ID);
+        DBMS_OUTPUT.PUT_LINE('부서명 '||V_DEPT.DEPT_TITLE);
+        DBMS_OUTPUT.PUT_LINE('지역코드 '||V_DEPT.LOCATION_ID);
+    END LOOP;
+    CLOSE C1; -- 커서의 끝
+END;
+/
+
+EXEC CURSOR_DEPT;
+
+
+-- FOR IN 반복문을 사용하면
+-- 반복시에 자동으로 커서를 OPEN하고 각 행을 자동으로 FETCH하며 반복이 종료될 떄 자동으로 커서를 CLOSE한다
+
+CREATE OR REPLACE PROCEDURE CURSOR_DEPT
+IS
+    V_DEPT DEPARTMENT%ROWTYPE;
+    CURSOR C1
+    IS
+    SELECT * FROM DEPARTMENT;
+BEGIN
+    FOR V_DEPT IN C1 LOOP
+        DBMS_OUTPUT.PUT_LINE('부서코드 '||V_DEPT.DEPT_ID);
+        DBMS_OUTPUT.PUT_LINE('부서명 '||V_DEPT.DEPT_TITLE);
+        DBMS_OUTPUT.PUT_LINE('지역코드 '||V_DEPT.LOCATION_ID);
+    END LOOP;
+END;
+/
+
+EXEC CURSOR_DEPT;
+
+CREATE OR REPLACE PROCEDURE CURSOR_DEPT
+IS
+    V_DEPT DEPARTMENT%ROWTYPE;
+BEGIN
+    FOR V_DEPT IN (SELECT * FROM DEPARTMENT) LOOP
+        DBMS_OUTPUT.PUT_LINE('부서코드 '||V_DEPT.DEPT_ID);
+        DBMS_OUTPUT.PUT_LINE('부서명 '||V_DEPT.DEPT_TITLE);
+        DBMS_OUTPUT.PUT_LINE('지역코드 '||V_DEPT.LOCATION_ID);
+    END LOOP;
+END;
+/
+
+EXEC CURSOR_DEPT;
+
+-- 3. 실습
+-- 각 사원들의 사원명, 부서명, 직급명, 급여를 모두 출력하는 프로시저를 만들어보셈
+-- 단 2가지 방식으로 작성하셈 CURSOR_EMP_01은 1번방식 CURSOR_EMP_02는 3번방식으로 하셈
+CREATE OR REPLACE PROCEDURE CURSOR_EMP_01
+IS
+    V_EMP EMPLOYEE%ROWTYPE;
+    V_DEPT DEPARTMENT%ROWTYPE;
+    V_JOB JOB%ROWTYPE;
+    V_SAL EMPLOYEE%ROWTYPE;
+    CURSOR C1
+    IS
+    SELECT * FROM EMPLOYEE JOIN DEPARTMENT ON (DEPT_CODE=DEPT_ID) JOIN JOB USING (JOB_CODE);
+BEGIN
+    OPEN C1;
+    LOOP
+        FETCH C1
+        INTO
+            V_EMP.EMP_NAME,
+            V_DEPT.DEPT_TITLE,
+            V_JOB.JOB_NAME,
+            V_SAL.SALARY;
+        EXIT WHEN C1%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('사원명 '||V_EMP.EMP_NAME||' 부서명 '||V_DEPT.DEPT_TITLE||' 직급명 '||V_JOB.JOB_NAME||' 급여 '||V_SAL.SALARY);
+    END LOOP;
+    CLOSE C1;
+END;
+/
+    
+EXEC CURSOR_EMP_01;
+
+CREATE OR REPLACE PROCEDURE CURSOR_EMP_02
+IS
+    V_EMP EMPLOYEE%ROWTYPE;
+BEGIN
+    FOR V_DEPT IN (SELECT * FROM EMPLOYEE JOIN DEPARTMENT ON (DEPT_CODE=DEPT_ID) JOIN JOB USING (JOB_CODE)) LOOP
+        DBMS_OUTPUT.PUT_LINE('사원명 '||V_EMP.EMP_NAME||' 부서명 '||V_DEPT.DEPT_TITLE||' 직급명 '||V_JOB.JOB_NAME||' 급여 '||V_SAL.SALARY);
+    END LOOP;
+END;
+/
+
+-- TRIGGER
+-- 특정 테이블이나 뷰에서 DML 동작이 수행될 때 해당 시점을 감지하여 자동으로 동작하는 스크립트를 정의할 수 있는 객체
+-- 사용자가 직접 DML을 수행하는 것이 아니라 데이터베이스에서 자동으로 처리하는 로직이다
+-- 트리거의 종류
+-- 전체 행에 대한 트리거
+-- 각 행에 대한 트리거
+
+CREATE OR REPLACE TRIGGER TRG_01
+AFTER INSERT -- BEFORE 시점파악 [INSERT | UPDATE | DELETE]
+ON EMPLOYEE
+DECLARE
+    V_EMP_NAME EMPLOYEE.EMP_NAME%TYPE;
+BEGIN
+    SELECT EMP_NAME
+    INTO V_EMP_NAME
+    FROM (SELECT * FROM EMPLOYEE ORDER BY HIRE_DATE DESC)
+    WHERE ROWNUM=1;
+    DBMS_OUTPUT.PUT_LINE(V_EMP_NAME||' 사원이 입사했읍니다.');
+    DBMS_OUTPUT.PUT_LINE('환영해주시오.');
+END;
+/
+
+INSERT INTO EMPLOYEE
+VALUES(SEQ_EID.NEXTVAL,'박재성','550508-1876843','park_js@kh.or.kr','01044551122','D6','J4','S4',4500000,0.1,'200',SYSDATE,NULL,DEFAULT);
+
+COMMIT;
+
+-- 트리거를 응용한 사례
+-- 제품 관리 시스템
+-- 제품 정보 테이블
+-- 실제 데이터를 많이 저장해야 하는 테이블들의 기본키는 일반 숫자 데이터를 활용한다
+CREATE TABLE PRODUCT(
+    PCODE NUMBER PRIMARY KEY,
+    PNAME VARCHAR2(30),
+    BRAND VARCHAR2(30),
+    PRICE NUMBER,
+    STOCK NUMBER DEFAULT 0
+);
+
+-- 제품 입출고 내역 테이블
+CREATE TABLE PRODUCT_DETAIL(
+    DCODE NUMBER PRIMARY KEY,
+    PCODE NUMBER NOT NULL,
+    PDATE DATE DEFAULT SYSDATE,
+    AMOUNT NUMBER,
+    STATUS CHAR(6) CHECK(STATUS IN ('입고','출고')),
+    CONSTRAINT FK_PCODE FOREIGN KEY (PCODE) REFERENCES PRODUCT(PCODE)
+);
+
+SELECT * FROM PRODUCT;
+SELECT * FROM PRODUCT_DETAIL;
+COMMIT;
+
+CREATE SEQUENCE SEQ_PRODUCT;
+CREATE SEQUENCE SEQ_DETAIL;
+
+-- 제품 등록
+INSERT INTO PRODUCT
+VALUES(SEQ_PRODUCT.NEXTVAL,'와얼드올프','Fcigar',65000,DEFAULT);
+
+INSERT INTO PRODUCT
+VALUES(SEQ_PRODUCT.NEXTVAL,'시바킷','킥베이크',85000,DEFAULT);
+
+INSERT INTO PRODUCT
+VALUES(SEQ_PRODUCT.NEXTVAL,'드라구','Voodoo',780000,DEFAULT);
+
+-- 제품 입, 출고 관련 재고 증감 트리거
+CREATE OR REPLACE TRIGGER TRG_02
+    AFTER INSERT ON PRODUCT_DETAIL
+    FOR EACH ROW
+BEGIN
+    IF :NEW.STATUS='입고'
+    THEN
+        UPDATE PRODUCT
+        SET STOCK=STOCK+:NEW.AMOUNT
+        WHERE PCODE=:NEW.PCODE;
+    END IF;
+    IF :NEW.STATUS='출고'
+    THEN
+        UPDATE PRODUCT
+        SET STOCK=STOCK-:NEW.AMOUNT
+        WHERE PCODE=:NEW.PCODE;
+    END IF;
+END;
+/
+
+-- 입, 출고 진행하기
+INSERT INTO PRODUCT_DETAIL
+VALUES(SEQ_DETAIL.NEXTVAL,4,SYSDATE,500,'입고');
+
+INSERT INTO PRODUCT_DETAIL
+VALUES(SEQ_DETAIL.NEXTVAL,5,SYSDATE,500,'입고');
+
+INSERT INTO PRODUCT_DETAIL
+VALUES(SEQ_DETAIL.NEXTVAL,6,SYSDATE,1500,'입고');
+
+SELECT * FROM PRODUCT;
+
+INSERT INTO PRODUCT_DETAIL
+VALUES(SEQ_DETAIL.NEXTVAL,4,SYSDATE,100,'출고');
+
+COMMIT;
